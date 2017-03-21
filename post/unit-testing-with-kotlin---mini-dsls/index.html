@@ -1,0 +1,345 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta content="jesse hodges, software, kotlin" name="keywords">
+<meta content="Jesse Hodges" name="author">
+<meta property="og:title" content="Unit testing with kotlin - mini dsls - gjesse.github.io">
+<meta property="og:url" content="https://gjesse.github.io/post/unit-testing-with-kotlin---mini-dsls/">
+<meta property="og:description" content="Your description here">
+<meta property="og:type" content="website" />
+<title>Unit testing with kotlin - mini dsls | gjesse.github.io</title>
+<link rel="stylesheet" href="https://gjesse.github.io//css/style.css">
+<link rel="shortcut icon" href="https://gjesse.github.io//wave.ico">
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/styles/solarized-light.min.css">
+
+
+<section class="section">
+  <div class="container">
+    <nav class="nav">
+      <div class="nav-left">
+        <a class="nav-item" href="https://gjesse.github.io/"><h1 class="title is-4">gjesse.github.io</h1></a>
+      </div>
+      <div class="nav-right">
+        <nav class="nav-item level is-mobile">
+          
+          <a class="level-item" href="https://github.com/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-github"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="https://twitter.com/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-twitter"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="https://linkedin.com/in/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-linkedin-square"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="/index.xml" target="_blank">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+          </a>
+          
+        </nav>
+      </div>
+    </nav>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h1 class="title">Unit testing with kotlin - mini dsls</h1>
+    <h2 class="subtitle is-5">March 20, 2017 by Jesse Hodges</h2>
+    
+    <div class="content">
+      
+
+<p>Fair warning: these examples are contrived, but the structure is very much based on a real world problem.</p>
+
+<h2 id="testing-against-a-shared-persistence-layer">testing against a shared persistence layer</h2>
+
+<p>Recently I was writing a series of unit tests for a homegrown query language. The query language was designed to be end-user friendly for moderately to advanced technical users. The data being searched on is stored in ElasticSearch, and we needed to test a variety of edge cases and ensure that they were correctly translated into ES queries.</p>
+
+<p>Initially I considered inspecting our internally generated ES queries, but that approach was quickly abandoned. ES queries are complex, and honestly making assertions on the structure of the query is just an implementation detail. What I really cared about was that a search for <code>abc || efg</code> matched what you would expect it to match. Fortunately ES is just in java, so we can spin up an internal cluster just for testing purposes. However that takes a little while, so internal ES instance was setup as a static <code>@ClassRule</code>, so that all test variations could take advantage of the same server.</p>
+
+<p>That done, all I had to submit a plain text query string to a class that produced an elasticSearch query, then run the query and assert on the final results. However, before that I needed to create some entities in ES to search on. So my first iteration looked something like this:</p>
+
+<pre><code class="language-kotlin">@Test
+fun `simple OR query matches 2 entities`() {
+
+    val query = &quot;abc || def&quot;
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    val results = dao.query(query)
+
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+    
+}
+</code></pre>
+
+<p>This works pretty well.  However as soon as I have another test case, it starts breaking down.</p>
+
+<pre><code class="language-kotlin">@Test
+fun `asterisk matches all sources`() {
+
+    val query = &quot;*&quot;
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    val results = dao.query(query)
+
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+}
+</code></pre>
+
+<p>Looks good, right? well, not necessarily. It <em>might</em> appear work, but only if our <code>dao</code> code is using the entity as the primary key. It is, but we don&rsquo;t want to rely on that - our next test might need to put 4 different entities, or name them differently, and now we have persisted, shared state between our tests. Worse, it&rsquo;s not immediately obvious that this is happening, so when your tests start breaking later, it will be that much harder to track down the problem.</p>
+
+<p>So we have a few possible solutions:</p>
+
+<ol>
+<li><p>Precreate a shared entity set for all tests to use.</p>
+
+<p>This is a fairly resonable approach and will usually scale to a small number of tests. Inevitably though, you&rsquo;ll want to test something that&rsquo;s <em>not</em> in that set.. and you still have the shared state problem.</p></li>
+
+<li><p>use Junit <code>@Params</code>, and create and delete using <code>@Before</code> and <code>@After</code>.</p>
+
+<p>Another not-unreasonable approach, but again I find it lacks flexibility over time. As well, the input is separated from each individual test in another part of the file, so figuring out why any one test is failing requires the added context of figuring out how <code>@Params</code> are being used.</p></li>
+
+<li><p>Each test creates &amp; deletes it&rsquo;s own data</p>
+
+<p>Avoids the problems with the other solutions, but now we have tests that look like this:</p></li>
+</ol>
+
+<pre><code class="language-kotlin">@Test
+fun `test template`() {
+    // setup
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+    val query = &quot;*&quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+
+    // cleanup
+    dao.delete(entity1)
+    dao.delete(entity2)
+}
+</code></pre>
+
+<h2 id="go-speed-racer">go speed racer</h2>
+
+<p>This is getting there, but we&rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&rsquo;ll soon realize that ES sometimes doesn&rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using the great <a href="http://www.awaitility.org/">Awaitility</a> tool, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!</p>
+
+<pre><code class="language-kotlin">@Test
+fun `test template with await`() {
+    // setup
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+    val query = &quot;*&quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    await().until(
+            Runnable {
+                assertThat(dao.get(entity1)).isNotNull()
+                assertThat(dao.get(entity2)).isNotNull()
+            }
+    )
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+            .containsAll(listOf(entity1, entity2))
+            .hasSize(2)
+
+    // cleanup
+    dao.delete(entity1)
+    dao.delete(entity2)
+
+    await().until(
+            Runnable {
+                assertThat(dao.get(entity1)).isNull()
+                assertThat(dao.get(entity2)).isNull()
+            }
+    )
+}
+</code></pre>
+
+<p>Welp&hellip; it works, but that&rsquo;s really getting a lot of boilerplate going on now. Let&rsquo;s abstract some of the common put and wait / delete and wait functionality.</p>
+
+<pre><code class="language-kotlin">@Test
+fun `test template with put - delete`() {
+    // setup
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+    val entities = listOf(entity1, entity2)
+    val query = &quot;*&quot;
+
+    put(entities)
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+            .containsAll(listOf(entity1, entity2))
+            .hasSize(2)
+
+    // cleanup
+    delete(entities)
+}
+
+fun put(entities: List&lt;String&gt;) {
+    entities.forEach { dao::put }
+    await().until(
+            Runnable {
+                assertThat(entities.mapNotNull {
+                    dao::get
+                }).isEqualTo(entities)
+            }
+    )
+}
+
+fun delete(entities: List&lt;String&gt;) {
+    entities.forEach { dao::delete }
+    await().until(
+            Runnable {
+                assertThat(entities.mapNotNull {
+                    dao::get
+                }).hasSize(0)
+            }
+    )
+}
+</code></pre>
+
+<h2 id="making-a-mini-dsl">making a mini-dsl</h2>
+
+<p>Looks good, but we still have to remember to call both put and delete, wouldn&rsquo;t it be better to wrap up this behavior into a common function to protect ourselves from future errors?
+Let&rsquo;s wrap the put/delete behavior around an arbitrary code block using Kotlin&rsquo;s receiver functions:</p>
+
+<pre><code class="language-kotlin">@Test
+fun `test template with put and delete`() {
+    // setup
+    val entity1 = &quot;abc&quot;
+    val entity2 = &quot;def&quot;
+    val entities = listOf(entity1, entity2)
+    val query = &quot;*&quot;
+
+    putAndDelete(entities) {
+        // act
+        val results = dao.query(query)
+
+        // assert
+        assertThat(results)
+                .containsAll(listOf(entity1, entity2))
+                .hasSize(2)
+
+    }
+}
+fun putAndDelete(entities: List&lt;String&gt;, block: () -&gt; Unit) {
+    put(entities)
+    block()
+    delete(entities)
+}
+</code></pre>
+
+<p>Now this is starting to look pretty nice! What&rsquo;s next? we can pass our entity list back to the receiver function. This isn&rsquo;t strictly necessary, but I like it.</p>
+
+<pre><code class="language-kotlin">@Test
+fun `test template with put and delete - receiving entities`() {
+    // setup
+    val query = &quot;*&quot;
+    putAndDelete(listOf(&quot;abc&quot;, &quot;def&quot;)) {
+        entities -&gt;
+        // act
+        val results = dao.query(query)
+
+        // assert
+        assertThat(results)
+                .containsAll(entities)
+                .hasSize(2)
+    }
+}
+
+fun putAndDelete(entities: List&lt;String&gt;, block: (List&lt;String&gt;) -&gt; Unit) {
+    put(entities)
+    block(entities)
+    delete(entities)
+}
+</code></pre>
+
+<h2 id="whoops-try-harder">Whoops, try harder</h2>
+
+<p>Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our <code>block()</code> receiver throws an exception? that&rsquo;s right, then <code>delete()</code> never gets called. Since we spent the time making this all nice and usable, it&rsquo;s now trivial to fix this for all existing and future tests:</p>
+
+<pre><code class="language-kotlin">fun putAndDelete(entities: List&lt;String&gt;, block: (List&lt;String&gt;) -&gt; Unit) {
+    try {
+        put(entities)
+        block(entities)
+    } finally {
+        delete(entities)
+    }
+}
+</code></pre>
+
+<p>There you go, we&rsquo;ve just created a mini-dsl for our specific test case. One that wraps up common behavior in a readable and understable way, and lets us focus on writing simple test cases, while still allowing us a good level of flexibility for each specific test. Enjoy! Source code for the examples is <a href="https://github.com/gjesse/kotlin-mini-dsl">here</a>.</p>
+
+    </div>
+    
+        <div class="nav-left">
+    <a class="nav-item" href="https://www.facebook.com/sharer/sharer.php?u=https%3a%2f%2fgjesse.github.io%2fpost%2funit-testing-with-kotlin---mini-dsls%2f" title="Share on Facebook" target="_blank"><span class="fa fa-facebook fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://plus.google.com/share?url=https%3a%2f%2fgjesse.github.io%2fpost%2funit-testing-with-kotlin---mini-dsls%2f" title="Share on Google+" target="_blank"><span class="fa fa-google-plus fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fgjesse.github.io%2fpost%2funit-testing-with-kotlin---mini-dsls%2f" title="Share on LinkedIn" target="_blank"><span class="fa fa-linkedin fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://twitter.com/home?status=Unit%20testing%20with%20kotlin%20-%20mini%20dsls - https%3a%2f%2fgjesse.github.io%2fpost%2funit-testing-with-kotlin---mini-dsls%2f" title="Tweet this" target="_blank"><span class="fa fa-twitter fa-2x"></span></a>
+    <a class="nav-item" href="http://www.reddit.com/submit?url=https%3a%2f%2fgjesse.github.io%2fpost%2funit-testing-with-kotlin---mini-dsls%2f&title=Unit%20testing%20with%20kotlin%20-%20mini%20dsls" title="Share on Reddit" target="_blank"><span class="fa fa-reddit-alien fa-2x" aria-hidden="true"></span></a>
+    
+    </div>
+    
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container has-text-centered">
+    <p>&copy; 2017 | Follow on <a href="https://twitter.com/gjesse" target="_blank">Twitter</a></p>
+  </div>
+</section>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/highlight.min.js" integrity="sha-384-BA64Pbom6s1cFobK6lLrxH00+tV8fV79eto4YAbT6JTQNvI8edolukUleKe2T/6L" crossorigin="anonymous"></script>
+
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/kotlin.min.js"></script>
+
+<script>hljs.initHighlightingOnLoad();</script>
+
+

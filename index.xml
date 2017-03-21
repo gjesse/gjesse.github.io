@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>gjesse.github.io</title>
+    <link>https://gjesse.github.io/index.xml</link>
+    <description>Recent content on gjesse.github.io</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2017 | Follow on &lt;a href=&#34;https://twitter.com/gjesse&#34; target=&#34;_blank&#34;&gt;Twitter&lt;/a&gt;</copyright>
+    <lastBuildDate>Mon, 20 Mar 2017 18:47:03 -0500</lastBuildDate>
+    <atom:link href="https://gjesse.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Unit testing with kotlin - mini dsls</title>
+      <link>https://gjesse.github.io/post/unit-testing-with-kotlin---mini-dsls/</link>
+      <pubDate>Mon, 20 Mar 2017 18:47:03 -0500</pubDate>
+      
+      <guid>https://gjesse.github.io/post/unit-testing-with-kotlin---mini-dsls/</guid>
+      <description>
+
+&lt;p&gt;Fair warning: these examples are contrived, but the structure is very much based on a real world problem.&lt;/p&gt;
+
+&lt;h2 id=&#34;testing-against-a-shared-persistence-layer&#34;&gt;testing against a shared persistence layer&lt;/h2&gt;
+
+&lt;p&gt;Recently I was writing a series of unit tests for a homegrown query language. The query language was designed to be end-user friendly for moderately to advanced technical users. The data being searched on is stored in ElasticSearch, and we needed to test a variety of edge cases and ensure that they were correctly translated into ES queries.&lt;/p&gt;
+
+&lt;p&gt;Initially I considered inspecting our internally generated ES queries, but that approach was quickly abandoned. ES queries are complex, and honestly making assertions on the structure of the query is just an implementation detail. What I really cared about was that a search for &lt;code&gt;abc || efg&lt;/code&gt; matched what you would expect it to match. Fortunately ES is just in java, so we can spin up an internal cluster just for testing purposes. However that takes a little while, so internal ES instance was setup as a static &lt;code&gt;@ClassRule&lt;/code&gt;, so that all test variations could take advantage of the same server.&lt;/p&gt;
+
+&lt;p&gt;That done, all I had to submit a plain text query string to a class that produced an elasticSearch query, then run the query and assert on the final results. However, before that I needed to create some entities in ES to search on. So my first iteration looked something like this:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `simple OR query matches 2 entities`() {
+
+    val query = &amp;quot;abc || def&amp;quot;
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    val results = dao.query(query)
+
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+    
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This works pretty well.  However as soon as I have another test case, it starts breaking down.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `asterisk matches all sources`() {
+
+    val query = &amp;quot;*&amp;quot;
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    val results = dao.query(query)
+
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Looks good, right? well, not necessarily. It &lt;em&gt;might&lt;/em&gt; appear work, but only if our &lt;code&gt;dao&lt;/code&gt; code is using the entity as the primary key. It is, but we don&amp;rsquo;t want to rely on that - our next test might need to put 4 different entities, or name them differently, and now we have persisted, shared state between our tests. Worse, it&amp;rsquo;s not immediately obvious that this is happening, so when your tests start breaking later, it will be that much harder to track down the problem.&lt;/p&gt;
+
+&lt;p&gt;So we have a few possible solutions:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;Precreate a shared entity set for all tests to use.&lt;/p&gt;
+
+&lt;p&gt;This is a fairly resonable approach and will usually scale to a small number of tests. Inevitably though, you&amp;rsquo;ll want to test something that&amp;rsquo;s &lt;em&gt;not&lt;/em&gt; in that set.. and you still have the shared state problem.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;use Junit &lt;code&gt;@Params&lt;/code&gt;, and create and delete using &lt;code&gt;@Before&lt;/code&gt; and &lt;code&gt;@After&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Another not-unreasonable approach, but again I find it lacks flexibility over time. As well, the input is separated from each individual test in another part of the file, so figuring out why any one test is failing requires the added context of figuring out how &lt;code&gt;@Params&lt;/code&gt; are being used.&lt;/p&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;Each test creates &amp;amp; deletes it&amp;rsquo;s own data&lt;/p&gt;
+
+&lt;p&gt;Avoids the problems with the other solutions, but now we have tests that look like this:&lt;/p&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `test template`() {
+    // setup
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+    val query = &amp;quot;*&amp;quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+        .containsAll(listOf(entity1, entity2))
+        .hasSize(2)
+
+    // cleanup
+    dao.delete(entity1)
+    dao.delete(entity2)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;go-speed-racer&#34;&gt;go speed racer&lt;/h2&gt;
+
+&lt;p&gt;This is getting there, but we&amp;rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&amp;rsquo;ll soon realize that ES sometimes doesn&amp;rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using the great &lt;a href=&#34;http://www.awaitility.org/&#34;&gt;Awaitility&lt;/a&gt; tool, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `test template with await`() {
+    // setup
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+    val query = &amp;quot;*&amp;quot;
+
+    dao.put(entity1)
+    dao.put(entity2)
+
+    await().until(
+            Runnable {
+                assertThat(dao.get(entity1)).isNotNull()
+                assertThat(dao.get(entity2)).isNotNull()
+            }
+    )
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+            .containsAll(listOf(entity1, entity2))
+            .hasSize(2)
+
+    // cleanup
+    dao.delete(entity1)
+    dao.delete(entity2)
+
+    await().until(
+            Runnable {
+                assertThat(dao.get(entity1)).isNull()
+                assertThat(dao.get(entity2)).isNull()
+            }
+    )
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Welp&amp;hellip; it works, but that&amp;rsquo;s really getting a lot of boilerplate going on now. Let&amp;rsquo;s abstract some of the common put and wait / delete and wait functionality.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `test template with put - delete`() {
+    // setup
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+    val entities = listOf(entity1, entity2)
+    val query = &amp;quot;*&amp;quot;
+
+    put(entities)
+
+    // act
+    val results = dao.query(query)
+
+    // assert
+    assertThat(results)
+            .containsAll(listOf(entity1, entity2))
+            .hasSize(2)
+
+    // cleanup
+    delete(entities)
+}
+
+fun put(entities: List&amp;lt;String&amp;gt;) {
+    entities.forEach { dao::put }
+    await().until(
+            Runnable {
+                assertThat(entities.mapNotNull {
+                    dao::get
+                }).isEqualTo(entities)
+            }
+    )
+}
+
+fun delete(entities: List&amp;lt;String&amp;gt;) {
+    entities.forEach { dao::delete }
+    await().until(
+            Runnable {
+                assertThat(entities.mapNotNull {
+                    dao::get
+                }).hasSize(0)
+            }
+    )
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;making-a-mini-dsl&#34;&gt;making a mini-dsl&lt;/h2&gt;
+
+&lt;p&gt;Looks good, but we still have to remember to call both put and delete, wouldn&amp;rsquo;t it be better to wrap up this behavior into a common function to protect ourselves from future errors?
+Let&amp;rsquo;s wrap the put/delete behavior around an arbitrary code block using Kotlin&amp;rsquo;s receiver functions:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `test template with put and delete`() {
+    // setup
+    val entity1 = &amp;quot;abc&amp;quot;
+    val entity2 = &amp;quot;def&amp;quot;
+    val entities = listOf(entity1, entity2)
+    val query = &amp;quot;*&amp;quot;
+
+    putAndDelete(entities) {
+        // act
+        val results = dao.query(query)
+
+        // assert
+        assertThat(results)
+                .containsAll(listOf(entity1, entity2))
+                .hasSize(2)
+
+    }
+}
+fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: () -&amp;gt; Unit) {
+    put(entities)
+    block()
+    delete(entities)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Now this is starting to look pretty nice! What&amp;rsquo;s next? we can pass our entity list back to the receiver function. This isn&amp;rsquo;t strictly necessary, but I like it.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun `test template with put and delete - receiving entities`() {
+    // setup
+    val query = &amp;quot;*&amp;quot;
+    putAndDelete(listOf(&amp;quot;abc&amp;quot;, &amp;quot;def&amp;quot;)) {
+        entities -&amp;gt;
+        // act
+        val results = dao.query(query)
+
+        // assert
+        assertThat(results)
+                .containsAll(entities)
+                .hasSize(2)
+    }
+}
+
+fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: (List&amp;lt;String&amp;gt;) -&amp;gt; Unit) {
+    put(entities)
+    block(entities)
+    delete(entities)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;whoops-try-harder&#34;&gt;Whoops, try harder&lt;/h2&gt;
+
+&lt;p&gt;Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our &lt;code&gt;block()&lt;/code&gt; receiver throws an exception? that&amp;rsquo;s right, then &lt;code&gt;delete()&lt;/code&gt; never gets called. Since we spent the time making this all nice and usable, it&amp;rsquo;s now trivial to fix this for all existing and future tests:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: (List&amp;lt;String&amp;gt;) -&amp;gt; Unit) {
+    try {
+        put(entities)
+        block(entities)
+    } finally {
+        delete(entities)
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;There you go, we&amp;rsquo;ve just created a mini-dsl for our specific test case. One that wraps up common behavior in a readable and understable way, and lets us focus on writing simple test cases, while still allowing us a good level of flexibility for each specific test. Enjoy! Source code for the examples is &lt;a href=&#34;https://github.com/gjesse/kotlin-mini-dsl&#34;&gt;here&lt;/a&gt;.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>
