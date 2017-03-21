@@ -111,7 +111,7 @@ fun `test template`() {
 
 &lt;h2 id=&#34;go-speed-racer&#34;&gt;go speed racer&lt;/h2&gt;
 
-&lt;p&gt;This is getting there, but we&amp;rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&amp;rsquo;ll soon realize that ES sometimes doesn&amp;rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using the great &lt;a href=&#34;http://www.awaitility.org/&#34;&gt;Awaitility&lt;/a&gt; tool, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!&lt;/p&gt;
+&lt;p&gt;This is getting there, but we&amp;rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&amp;rsquo;ll soon realize that ES sometimes doesn&amp;rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using &lt;a href=&#34;http://www.awaitility.org/&#34;&gt;Awaitility&lt;/a&gt;, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
 fun `test template with await`() {
@@ -156,9 +156,7 @@ fun `test template with await`() {
 &lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
 fun `test template with put - delete`() {
     // setup
-    val entity1 = &amp;quot;abc&amp;quot;
-    val entity2 = &amp;quot;def&amp;quot;
-    val entities = listOf(entity1, entity2)
+    val entities = listOf(&amp;quot;abc&amp;quot;, &amp;quot;abc&amp;quot;)
     val query = &amp;quot;*&amp;quot;
 
     put(entities)
@@ -168,7 +166,7 @@ fun `test template with put - delete`() {
 
     // assert
     assertThat(results)
-            .containsAll(listOf(entity1, entity2))
+            .containsAll(entities)
             .hasSize(2)
 
     // cleanup
@@ -206,9 +204,7 @@ Let&amp;rsquo;s wrap the put/delete behavior around an arbitrary code block usin
 &lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
 fun `test template with put and delete`() {
     // setup
-    val entity1 = &amp;quot;abc&amp;quot;
-    val entity2 = &amp;quot;def&amp;quot;
-    val entities = listOf(entity1, entity2)
+    val entities = listOf(&amp;quot;abc&amp;quot;, &amp;quot;abc&amp;quot;)
     val query = &amp;quot;*&amp;quot;
 
     putAndDelete(entities) {
@@ -217,7 +213,7 @@ fun `test template with put and delete`() {
 
         // assert
         assertThat(results)
-                .containsAll(listOf(entity1, entity2))
+                .containsAll(entities)
                 .hasSize(2)
 
     }
@@ -229,7 +225,7 @@ fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: () -&amp;gt; Unit)
 }
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Now this is starting to look pretty nice! What&amp;rsquo;s next? we can pass our entity list back to the receiver function. This isn&amp;rsquo;t strictly necessary, but I like it.&lt;/p&gt;
+&lt;p&gt;Now this is starting to look pretty sweet! What&amp;rsquo;s next? We can pass our entity list back to the receiver function. This isn&amp;rsquo;t strictly necessary, but I like it.&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
 fun `test template with put and delete - receiving entities`() {
@@ -256,7 +252,7 @@ fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: (List&amp;lt;Strin
 
 &lt;h2 id=&#34;whoops-try-harder&#34;&gt;Whoops, try harder&lt;/h2&gt;
 
-&lt;p&gt;Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our &lt;code&gt;block()&lt;/code&gt; receiver throws an exception? that&amp;rsquo;s right, then &lt;code&gt;delete()&lt;/code&gt; never gets called. Since we spent the time making this all nice and usable, it&amp;rsquo;s now trivial to fix this for all existing and future tests:&lt;/p&gt;
+&lt;p&gt;Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our &lt;code&gt;block()&lt;/code&gt; receiver throws an exception? That&amp;rsquo;s right, then &lt;code&gt;delete()&lt;/code&gt; never gets called. Since we spent the time making this all nice and reusable, it&amp;rsquo;s now trivial to fix this for all existing and future tests:&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;fun putAndDelete(entities: List&amp;lt;String&amp;gt;, block: (List&amp;lt;String&amp;gt;) -&amp;gt; Unit) {
     try {

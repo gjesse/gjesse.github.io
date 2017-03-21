@@ -157,7 +157,7 @@ fun `test template`() {
 
 <h2 id="go-speed-racer">go speed racer</h2>
 
-<p>This is getting there, but we&rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&rsquo;ll soon realize that ES sometimes doesn&rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using the great <a href="http://www.awaitility.org/">Awaitility</a> tool, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!</p>
+<p>This is getting there, but we&rsquo;ll soon be annoyed that we have to repeat very similar steps in each test. Furthermore, we&rsquo;ll soon realize that ES sometimes doesn&rsquo;t report changes right away when querying, so now we need to add some checks after each modification to make sure our changes are visible. Using <a href="http://www.awaitility.org/">Awaitility</a>, we finally have a set of tests that are independent from each other, easy to reason about, and self contained, Yay!</p>
 
 <pre><code class="language-kotlin">@Test
 fun `test template with await`() {
@@ -202,9 +202,7 @@ fun `test template with await`() {
 <pre><code class="language-kotlin">@Test
 fun `test template with put - delete`() {
     // setup
-    val entity1 = &quot;abc&quot;
-    val entity2 = &quot;def&quot;
-    val entities = listOf(entity1, entity2)
+    val entities = listOf(&quot;abc&quot;, &quot;abc&quot;)
     val query = &quot;*&quot;
 
     put(entities)
@@ -214,7 +212,7 @@ fun `test template with put - delete`() {
 
     // assert
     assertThat(results)
-            .containsAll(listOf(entity1, entity2))
+            .containsAll(entities)
             .hasSize(2)
 
     // cleanup
@@ -252,9 +250,7 @@ Let&rsquo;s wrap the put/delete behavior around an arbitrary code block using Ko
 <pre><code class="language-kotlin">@Test
 fun `test template with put and delete`() {
     // setup
-    val entity1 = &quot;abc&quot;
-    val entity2 = &quot;def&quot;
-    val entities = listOf(entity1, entity2)
+    val entities = listOf(&quot;abc&quot;, &quot;abc&quot;)
     val query = &quot;*&quot;
 
     putAndDelete(entities) {
@@ -263,7 +259,7 @@ fun `test template with put and delete`() {
 
         // assert
         assertThat(results)
-                .containsAll(listOf(entity1, entity2))
+                .containsAll(entities)
                 .hasSize(2)
 
     }
@@ -275,7 +271,7 @@ fun putAndDelete(entities: List&lt;String&gt;, block: () -&gt; Unit) {
 }
 </code></pre>
 
-<p>Now this is starting to look pretty nice! What&rsquo;s next? we can pass our entity list back to the receiver function. This isn&rsquo;t strictly necessary, but I like it.</p>
+<p>Now this is starting to look pretty sweet! What&rsquo;s next? We can pass our entity list back to the receiver function. This isn&rsquo;t strictly necessary, but I like it.</p>
 
 <pre><code class="language-kotlin">@Test
 fun `test template with put and delete - receiving entities`() {
@@ -302,7 +298,7 @@ fun putAndDelete(entities: List&lt;String&gt;, block: (List&lt;String&gt;) -&gt;
 
 <h2 id="whoops-try-harder">Whoops, try harder</h2>
 
-<p>Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our <code>block()</code> receiver throws an exception? that&rsquo;s right, then <code>delete()</code> never gets called. Since we spent the time making this all nice and usable, it&rsquo;s now trivial to fix this for all existing and future tests:</p>
+<p>Things are humming along now - your tests are passing, until one day someone checks in some code that breaks a test - actually it breaks 2 tests, but one is very sneaky. What happens if our <code>block()</code> receiver throws an exception? That&rsquo;s right, then <code>delete()</code> never gets called. Since we spent the time making this all nice and reusable, it&rsquo;s now trivial to fix this for all existing and future tests:</p>
 
 <pre><code class="language-kotlin">fun putAndDelete(entities: List&lt;String&gt;, block: (List&lt;String&gt;) -&gt; Unit) {
     try {
