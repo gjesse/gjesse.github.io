@@ -7,7 +7,24 @@
   </url>
   
   <url>
+    <loc>https://gjesse.github.io/categories/</loc>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>https://gjesse.github.io/categories/kotlin/</loc>
+    <lastmod>2017-03-20T18:47:03-05:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
     <loc>https://gjesse.github.io/post/</loc>
+    <lastmod>2017-03-20T18:47:03-05:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>https://gjesse.github.io/categories/testing/</loc>
     <lastmod>2017-03-20T18:47:03-05:00</lastmod>
     <priority>0</priority>
   </url>
