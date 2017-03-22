@@ -7,8 +7,143 @@
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2017 | Follow on &lt;a href=&#34;https://twitter.com/gjesse&#34; target=&#34;_blank&#34;&gt;Twitter&lt;/a&gt;</copyright>
-    <lastBuildDate>Mon, 20 Mar 2017 18:47:03 -0500</lastBuildDate>
+    <lastBuildDate>Wed, 22 Mar 2017 17:19:53 -0500</lastBuildDate>
     <atom:link href="https://gjesse.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Some nice Kotlin things - expressions</title>
+      <link>https://gjesse.github.io/post/some-nice-kotlin-things---expressions/</link>
+      <pubDate>Wed, 22 Mar 2017 17:19:53 -0500</pubDate>
+      
+      <guid>https://gjesse.github.io/post/some-nice-kotlin-things---expressions/</guid>
+      <description>&lt;p&gt;Kotlin has a lot of great features. As someone coming to kotlin from a java background, I want to highlight some of the little things that make it great. Today, it&amp;rsquo;s expression assignments.&lt;/p&gt;
+
+&lt;p&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;assignment-from-an-if-expression&#34;&gt;Assignment from an if expression&lt;/h2&gt;
+
+&lt;h3 id=&#34;java&#34;&gt;java&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;@Test
+public void assignmentAsResultOfIf(){
+    boolean newSearch = false;
+    String searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;;
+
+    final SearchResult res;
+    if (newSearch) {
+        res = searchNew(searchQuery);
+    } else {
+        res = searchOld(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&amp;quot;old&amp;quot;);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Notice how we have to declare the &lt;code&gt;SearchResult&lt;/code&gt; variable outside of the if block scope. Fortunately we can still make it &lt;code&gt;final&lt;/code&gt;.&lt;/p&gt;
+
+&lt;h3 id=&#34;kotlin&#34;&gt;kotlin&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun assignmentAsResultOfIf() {
+    val newSearch = false
+    val searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;
+    val res = if (newSearch) {
+        searchNew(searchQuery)
+    } else {
+        searchOld(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&amp;quot;old&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;In kotlin, we can make this more succinct by assigning the result of the &lt;code&gt;if&lt;/code&gt; expression to our result.&lt;/p&gt;
+
+&lt;h2 id=&#34;assignment-as-a-result-of-a-try-expression&#34;&gt;Assignment as a result of a try expression&lt;/h2&gt;
+
+&lt;h3 id=&#34;java-1&#34;&gt;java&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;@Test
+public void assignmentAsResultOfTry(){
+    boolean doThrow = false;
+    String searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;;
+
+    SearchResult res;
+    try {
+        res = searchNewExceptional(searchQuery, doThrow);
+    } catch (Exception e) {
+        res = searchOld(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&amp;quot;new&amp;quot;);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Again, we have to declare the result outside of the scope of the &lt;code&gt;try&lt;/code&gt; block, only now it can&amp;rsquo;t be &lt;code&gt;final&lt;/code&gt; anymore, becuase the catch block cannot actually know if the variable has already been initialized.  You might put the try block into it&amp;rsquo;s own method to resolve this.&lt;/p&gt;
+
+&lt;h3 id=&#34;kotlin-1&#34;&gt;kotlin&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun assignmentAsResultOfTry() {
+    val doThrow = false
+    val searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;
+    val res = try {
+        searchNewExceptional(searchQuery, doThrow)
+    } catch (e: Exception) {
+        searchOld(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&amp;quot;new&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;The kotlin version stays succinct, and we can maintain our final-ness with no extra work.&lt;/p&gt;
+
+&lt;h2 id=&#34;assignment-as-a-result-of-a-when-switch-expression&#34;&gt;Assignment as a result of a when/switch expression&lt;/h2&gt;
+
+&lt;h3 id=&#34;java-2&#34;&gt;java&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-java&#34;&gt;@Test
+public void assignmentAsResultOfSwitch(){
+    int type = 2;
+    String searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;;
+    final SearchResult res;
+    switch (type) {
+        case 0:
+            res = searchOld(searchQuery);
+            break;
+        case 1:
+            res = searchNew(searchQuery);
+            break;
+        default:
+            res = searchNew(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&amp;quot;new&amp;quot;);
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;At least we get &lt;code&gt;final&lt;/code&gt; back here.&lt;/p&gt;
+
+&lt;h3 id=&#34;kotlin-2&#34;&gt;kotlin&lt;/h3&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-kotlin&#34;&gt;@Test
+fun assignmentAsResultOfWhen() {
+    val type = 2
+    val searchQuery = &amp;quot;leonardo &amp;amp;&amp;amp; raphael&amp;quot;
+    val res = when (type) {
+        0 -&amp;gt; searchOld(searchQuery)
+        1 -&amp;gt; searchNew(searchQuery)
+        else -&amp;gt; searchNew(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&amp;quot;new&amp;quot;)
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Similar pattern to other examples, although &lt;code&gt;when&lt;/code&gt; in kotlin is much more powerful than java&amp;rsquo;s &lt;code&gt;switch&lt;/code&gt;, but that&amp;rsquo;s another topic.&lt;/p&gt;
+
+&lt;h2 id=&#34;conclusion&#34;&gt;Conclusion&lt;/h2&gt;
+
+&lt;p&gt;These are some quickly contrived examples to show the basic pattern, but it&amp;rsquo;s one of the many little things that make kotlin fun to work with. One might reasonably look at this and wonder what the big deal is. After all, the basic workings of the kotlin examples all can be accomplished by adding another java method, but in the end your code readability suffers a bit in java. And in the end, code readability leads to better code that&amp;rsquo;s easier to maintain, so any improvements here should not be taken lightly, however small they may seem.&lt;/p&gt;
+
+&lt;p&gt;Source code for examples are &lt;a href=&#34;https://github.com/gjesse/some-nice-kotlin-things&#34;&gt;here&lt;/a&gt;&lt;/p&gt;</description>
+    </item>
     
     <item>
       <title>Unit testing with kotlin - mini dsls</title>

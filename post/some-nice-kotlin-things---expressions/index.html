@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+<html lang="en-us">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta content="jesse hodges, software, kotlin" name="keywords">
+<meta content="Jesse Hodges" name="author">
+<meta property="og:title" content="Some nice Kotlin things - expressions - gjesse.github.io">
+<meta property="og:url" content="https://gjesse.github.io/post/some-nice-kotlin-things---expressions/">
+<meta property="og:description" content="Your description here">
+<meta property="og:type" content="website" />
+<title>Some nice Kotlin things - expressions | gjesse.github.io</title>
+<link rel="stylesheet" href="https://gjesse.github.io//css/style.css">
+<link rel="shortcut icon" href="https://gjesse.github.io//gears.ico">
+<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/styles/solarized-light.min.css">
+
+
+<section class="section">
+  <div class="container">
+    <nav class="nav">
+      <div class="nav-left">
+        <a class="nav-item" href="https://gjesse.github.io/"><h1 class="title is-4">gjesse.github.io</h1></a>
+      </div>
+      <div class="nav-right">
+        <nav class="nav-item level is-mobile">
+          
+          <a class="level-item" href="https://github.com/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-github"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="https://twitter.com/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-twitter"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="https://linkedin.com/in/gjesse" target="_blank">
+            <span class="icon">
+              <i class="fa fa-linkedin-square"></i>
+            </span>
+          </a>
+          
+          <a class="level-item" href="/index.xml" target="_blank">
+            <span class="icon">
+              <i class="fa fa-rss"></i>
+            </span>
+          </a>
+          
+        </nav>
+      </div>
+    </nav>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h1 class="title">Some nice Kotlin things - expressions</h1>
+    <h2 class="subtitle is-5">March 22, 2017 by Jesse Hodges</h2>
+    
+    <div class="content">
+      <p>Kotlin has a lot of great features. As someone coming to kotlin from a java background, I want to highlight some of the little things that make it great. Today, it&rsquo;s expression assignments.</p>
+
+<p></p>
+
+<h2 id="assignment-from-an-if-expression">Assignment from an if expression</h2>
+
+<h3 id="java">java</h3>
+
+<pre><code class="language-java">@Test
+public void assignmentAsResultOfIf(){
+    boolean newSearch = false;
+    String searchQuery = &quot;leonardo &amp;&amp; raphael&quot;;
+
+    final SearchResult res;
+    if (newSearch) {
+        res = searchNew(searchQuery);
+    } else {
+        res = searchOld(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&quot;old&quot;);
+}
+</code></pre>
+
+<p>Notice how we have to declare the <code>SearchResult</code> variable outside of the if block scope. Fortunately we can still make it <code>final</code>.</p>
+
+<h3 id="kotlin">kotlin</h3>
+
+<pre><code class="language-kotlin">@Test
+fun assignmentAsResultOfIf() {
+    val newSearch = false
+    val searchQuery = &quot;leonardo &amp;&amp; raphael&quot;
+    val res = if (newSearch) {
+        searchNew(searchQuery)
+    } else {
+        searchOld(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&quot;old&quot;)
+}
+</code></pre>
+
+<p>In kotlin, we can make this more succinct by assigning the result of the <code>if</code> expression to our result.</p>
+
+<h2 id="assignment-as-a-result-of-a-try-expression">Assignment as a result of a try expression</h2>
+
+<h3 id="java-1">java</h3>
+
+<pre><code class="language-java">@Test
+public void assignmentAsResultOfTry(){
+    boolean doThrow = false;
+    String searchQuery = &quot;leonardo &amp;&amp; raphael&quot;;
+
+    SearchResult res;
+    try {
+        res = searchNewExceptional(searchQuery, doThrow);
+    } catch (Exception e) {
+        res = searchOld(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&quot;new&quot;);
+}
+</code></pre>
+
+<p>Again, we have to declare the result outside of the scope of the <code>try</code> block, only now it can&rsquo;t be <code>final</code> anymore, becuase the catch block cannot actually know if the variable has already been initialized.  You might put the try block into it&rsquo;s own method to resolve this.</p>
+
+<h3 id="kotlin-1">kotlin</h3>
+
+<pre><code class="language-kotlin">@Test
+fun assignmentAsResultOfTry() {
+    val doThrow = false
+    val searchQuery = &quot;leonardo &amp;&amp; raphael&quot;
+    val res = try {
+        searchNewExceptional(searchQuery, doThrow)
+    } catch (e: Exception) {
+        searchOld(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&quot;new&quot;)
+}
+</code></pre>
+
+<p>The kotlin version stays succinct, and we can maintain our final-ness with no extra work.</p>
+
+<h2 id="assignment-as-a-result-of-a-when-switch-expression">Assignment as a result of a when/switch expression</h2>
+
+<h3 id="java-2">java</h3>
+
+<pre><code class="language-java">@Test
+public void assignmentAsResultOfSwitch(){
+    int type = 2;
+    String searchQuery = &quot;leonardo &amp;&amp; raphael&quot;;
+    final SearchResult res;
+    switch (type) {
+        case 0:
+            res = searchOld(searchQuery);
+            break;
+        case 1:
+            res = searchNew(searchQuery);
+            break;
+        default:
+            res = searchNew(searchQuery);
+    }
+    assertThat(res.getType()).isEqualTo(&quot;new&quot;);
+}
+</code></pre>
+
+<p>At least we get <code>final</code> back here.</p>
+
+<h3 id="kotlin-2">kotlin</h3>
+
+<pre><code class="language-kotlin">@Test
+fun assignmentAsResultOfWhen() {
+    val type = 2
+    val searchQuery = &quot;leonardo &amp;&amp; raphael&quot;
+    val res = when (type) {
+        0 -&gt; searchOld(searchQuery)
+        1 -&gt; searchNew(searchQuery)
+        else -&gt; searchNew(searchQuery)
+    }
+    assertThat(res.type).isEqualTo(&quot;new&quot;)
+}
+</code></pre>
+
+<p>Similar pattern to other examples, although <code>when</code> in kotlin is much more powerful than java&rsquo;s <code>switch</code>, but that&rsquo;s another topic.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>These are some quickly contrived examples to show the basic pattern, but it&rsquo;s one of the many little things that make kotlin fun to work with. One might reasonably look at this and wonder what the big deal is. After all, the basic workings of the kotlin examples all can be accomplished by adding another java method, but in the end your code readability suffers a bit in java. And in the end, code readability leads to better code that&rsquo;s easier to maintain, so any improvements here should not be taken lightly, however small they may seem.</p>
+
+<p>Source code for examples are <a href="https://github.com/gjesse/some-nice-kotlin-things">here</a></p>
+    </div>
+    
+        <div class="nav-left">
+    <a class="nav-item" href="https://www.facebook.com/sharer/sharer.php?u=https%3a%2f%2fgjesse.github.io%2fpost%2fsome-nice-kotlin-things---expressions%2f" title="Share on Facebook" target="_blank"><span class="fa fa-facebook fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://plus.google.com/share?url=https%3a%2f%2fgjesse.github.io%2fpost%2fsome-nice-kotlin-things---expressions%2f" title="Share on Google+" target="_blank"><span class="fa fa-google-plus fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fgjesse.github.io%2fpost%2fsome-nice-kotlin-things---expressions%2f" title="Share on LinkedIn" target="_blank"><span class="fa fa-linkedin fa-2x" aria-hidden="true"></span></a>
+    <a class="nav-item" href="https://twitter.com/home?status=Some%20nice%20Kotlin%20things%20-%20expressions - https%3a%2f%2fgjesse.github.io%2fpost%2fsome-nice-kotlin-things---expressions%2f" title="Tweet this" target="_blank"><span class="fa fa-twitter fa-2x"></span></a>
+    <a class="nav-item" href="http://www.reddit.com/submit?url=https%3a%2f%2fgjesse.github.io%2fpost%2fsome-nice-kotlin-things---expressions%2f&title=Some%20nice%20Kotlin%20things%20-%20expressions" title="Share on Reddit" target="_blank"><span class="fa fa-reddit-alien fa-2x" aria-hidden="true"></span></a>
+    
+    </div>
+    
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <aside><div id="disqus_thread"></div></aside>
+    <script type="text/javascript">
+      var disqus_shortname = 'https-gjesse-github-io';
+      (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+      })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container has-text-centered">
+    <p>&copy; 2017 | Follow on <a href="https://twitter.com/gjesse" target="_blank">Twitter</a></p>
+  </div>
+</section>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/highlight.min.js" integrity="sha-384-BA64Pbom6s1cFobK6lLrxH00+tV8fV79eto4YAbT6JTQNvI8edolukUleKe2T/6L" crossorigin="anonymous"></script>
+
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/kotlin.min.js"></script>
+
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.10.0/languages/java.min.js"></script>
+
+<script>hljs.initHighlightingOnLoad();</script>
+
+
+<script>
+window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+ga('create', 'UA-94123510-1', 'auto');
+ga('send', 'pageview');
+</script>
+<script async src='//www.google-analytics.com/analytics.js'></script>
+
+
+
